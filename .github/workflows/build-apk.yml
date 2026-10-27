@@ -1,96 +1,57 @@
-name: SAAD DATA - Build APK
+name: Build SAAD DATA APK
 
 'on':
 workflow_dispatch:
-push:
-paths:
-- '.zip'
-- '**/.zip'
-- '.github/workflows/build-apk.yml'
-
-permissions:
-contents: read
 
 jobs:
 build:
-name: Extract Project and Build APK
 runs-on: ubuntu-latest
 
 steps:
-  - name: Download Repository
+  - name: Checkout repository
     uses: actions/checkout@v4
 
-  - name: Find and Extract Project ZIP
+  - name: Find and extract ZIP
     shell: bash
     run: |
-      set -e
-
-      ZIP_FILE=$(find . -maxdepth 3 -type f -name '*.zip' | head -n 1)
-
+      set -eu
+      ZIP_FILE="$(find . -maxdepth 3 -type f -name '*.zip' -print -quit)"
       if [ -z "$ZIP_FILE" ]; then
-        echo "ERROR: No ZIP file found in the repository."
+        echo "ERROR: Upload the project ZIP to the repository root."
         exit 1
       fi
-
-      echo "ZIP file: $ZIP_FILE"
-
       mkdir -p extracted_project
       unzip -o "$ZIP_FILE" -d extracted_project
 
-      echo "ZIP extraction completed."
-
-  - name: Locate Android Project
+  - name: Locate Android project
     shell: bash
     run: |
-      set -e
-
-      GRADLE_FILE=$(find extracted_project \
-        -type f \
-        -name settings.gradle -o -name settings.gradle.kts \
-        -not -path '*/.gradle/*' \
-        | head -n 1)
-
-      if [ -z "$GRADLE_FILE" ]; then
-        echo "ERROR: Android Gradle settings file not found."
-        find extracted_project -maxdepth 5 -type f | head -n 100
+      set -eu
+      SETTINGS="$(find extracted_project -type f -name settings.gradle -o -name settings.gradle.kts -print -quit)"
+      if [ -z "$SETTINGS" ]; then
+        echo "ERROR: Android settings.gradle file not found."
         exit 1
       fi
+      PROJECT_DIR="$(dirname "$SETTINGS")"
+      echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      PROJECT_DIR=$(dirname "$GRADLE_FILE")
-
-      echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-      echo "Project directory: $PROJECT_DIR"
-
-  - name: Set Up Java
+  - name: Set up Java
     uses: actions/setup-java@v4
     with:
       distribution: temurin
       java-version: '17'
 
-  - name: Build Debug APK
+  - name: Build APK
     shell: bash
     run: |
-      set -e
-
-      echo "Searching for Gradle wrapper..."
-
-      GRADLEW=$(find "$ANDROID_PROJECT_DIR" \
-        -type f \
-        -name gradlew \
-        | head -n 1)
-
+      set -eu
+      GRADLEW="$(find "$PROJECT_DIR" -type f -name gradlew -print -quit)"
       if [ -z "$GRADLEW" ]; then
-        echo "ERROR: gradlew was not found."
-        echo "Project files:"
-        find "$ANDROID_PROJECT_DIR" -maxdepth 5 -type f | head -n 100
+        echo "ERROR: gradlew is missing from the project ZIP."
+        find "$PROJECT_DIR" -maxdepth 4 -type f | head -n 80
         exit 1
       fi
-
-      PROJECT_DIR=$(dirname "$GRADLEW")
-
-      echo "Gradle wrapper: $GRADLEW"
-      cd "$PROJECT_DIR"
-
+      cd "$(dirname "$GRADLEW")"
       chmod +x gradlew
       ./gradlew assembleDebug
 
