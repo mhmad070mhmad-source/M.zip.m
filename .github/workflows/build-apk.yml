@@ -1,99 +1,103 @@
 name: SAAD DATA - Build APK
 
 'on':
-  workflow_dispatch:
-  push:
-    paths:
-      - '*.zip'
-      - '**/*.zip'
-      - '.github/workflows/build-apk.yml'
+workflow_dispatch:
+push:
+paths:
+- '.zip'
+- '**/.zip'
+- '.github/workflows/build-apk.yml'
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  build:
-    name: Extract Project and Build APK
-    runs-on: ubuntu-latest
+build:
+name: Extract Project and Build APK
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Download Repository
-        uses: actions/checkout@v4
+steps:
+  - name: Download Repository
+    uses: actions/checkout@v4
 
-      - name: Find and Extract Project ZIP
-        shell: bash
-        run: |
-          set -e
+  - name: Find and Extract Project ZIP
+    shell: bash
+    run: |
+      set -e
 
-          ZIP_FILE=$(find . -maxdepth 3 -type f -name '*.zip' | head -n 1)
+      ZIP_FILE=$(find . -maxdepth 3 -type f -name '*.zip' | head -n 1)
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found in the repository."
-            echo "Upload your SAAD DATA project ZIP to the repository root."
-            exit 1
-          fi
+      if [ -z "$ZIP_FILE" ]; then
+        echo "ERROR: No ZIP file found in the repository."
+        exit 1
+      fi
 
-          echo "Found project archive: $ZIP_FILE"
+      echo "ZIP file: $ZIP_FILE"
 
-          mkdir -p extracted_project
-          unzip -o "$ZIP_FILE" -d extracted_project
+      mkdir -p extracted_project
+      unzip -o "$ZIP_FILE" -d extracted_project
 
-          echo "Archive extracted successfully."
+      echo "ZIP extraction completed."
 
-      - name: Locate Android Project
-        shell: bash
-        run: |
-          set -e
+  - name: Locate Android Project
+    shell: bash
+    run: |
+      set -e
 
-          GRADLE_FILE=$(find extracted_project \
-            -type f \( -name settings.gradle -o -name settings.gradle.kts \) \
-            -not -path '*/.gradle/*' \
-            | head -n 1)
+      GRADLE_FILE=$(find extracted_project \
+        -type f \
+        -name settings.gradle -o -name settings.gradle.kts \
+        -not -path '*/.gradle/*' \
+        | head -n 1)
 
-          if [ -z "$GRADLE_FILE" ]; then
-            echo "ERROR: Could not find settings.gradle or settings.gradle.kts."
-            echo "The ZIP may not contain a complete Android project."
-            exit 1
-          fi
+      if [ -z "$GRADLE_FILE" ]; then
+        echo "ERROR: Android Gradle settings file not found."
+        find extracted_project -maxdepth 5 -type f | head -n 100
+        exit 1
+      fi
 
-          PROJECT_DIR=$(dirname "$GRADLE_FILE")
-          echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+      PROJECT_DIR=$(dirname "$GRADLE_FILE")
 
-          echo "Android project found at: $PROJECT_DIR"
+      echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+      echo "Project directory: $PROJECT_DIR"
 
-      - name: Set Up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+  - name: Set Up Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
 
-- name: Build Debug APK
-  shell: bash
-  run: |
-  set -e
-  
-      echo "Searching for gradlew..."
+  - name: Build Debug APK
+    shell: bash
+    run: |
+      set -e
 
-    GRADLEW=$(find extracted_project -type f -name gradlew | head -n 1)
+      echo "Searching for Gradle wrapper..."
 
-    if [ -z "$GRADLEW" ]; then
-      echo "ERROR: gradlew does not exist anywhere in the extracted project."
-      echo "Files found in the archive:"
-      find extracted_project -maxdepth 5 -type f | head -n 100
-      exit 1
-    fi
+      GRADLEW=$(find "$ANDROID_PROJECT_DIR" \
+        -type f \
+        -name gradlew \
+        | head -n 1)
 
-    PROJECT_DIR=$(dirname "$GRADLEW")
-    echo "Project directory: $PROJECT_DIR"
+      if [ -z "$GRADLEW" ]; then
+        echo "ERROR: gradlew was not found."
+        echo "Project files:"
+        find "$ANDROID_PROJECT_DIR" -maxdepth 5 -type f | head -n 100
+        exit 1
+      fi
 
-    cd "$PROJECT_DIR"
-    chmod +x gradlew
-    ./gradlew assembleDebug
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SAAD-DATA-APK
-          path: |
-            ${{ env.ANDROID_PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
+      PROJECT_DIR=$(dirname "$GRADLEW")
+
+      echo "Gradle wrapper: $GRADLEW"
+      cd "$PROJECT_DIR"
+
+      chmod +x gradlew
+      ./gradlew assembleDebug
+
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: SAAD-DATA-APK
+      path: extracted_project/**/build/outputs/apk/debug/*.apk
+      if-no-files-found: error
+      retention-days: 14
