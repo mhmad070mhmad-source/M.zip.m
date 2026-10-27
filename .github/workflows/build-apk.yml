@@ -67,21 +67,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build Debug APK
-        shell: bash
-        run: |
-          set -e
-          cd "$ANDROID_PROJECT_DIR"
+- name: Build Debug APK
+  shell: bash
+  run: |
+  set -e
+  
+      echo "Searching for gradlew..."
 
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          else
-            echo "ERROR: gradlew was not found in the Android project."
-            echo "The project ZIP may be incomplete."
-            exit 1
-          fi
+    GRADLEW=$(find extracted_project -type f -name gradlew | head -n 1)
 
+    if [ -z "$GRADLEW" ]; then
+      echo "ERROR: gradlew does not exist anywhere in the extracted project."
+      echo "Files found in the archive:"
+      find extracted_project -maxdepth 5 -type f | head -n 100
+      exit 1
+    fi
+
+    PROJECT_DIR=$(dirname "$GRADLEW")
+    echo "Project directory: $PROJECT_DIR"
+
+    cd "$PROJECT_DIR"
+    chmod +x gradlew
+    ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
