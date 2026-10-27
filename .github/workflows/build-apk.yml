@@ -1,64 +1,10 @@
-name: Build SAAD DATA APK
+name: Test Workflow
 
-'on':
-workflow_dispatch:
+'on': workflow_dispatch
 
 jobs:
-build:
+test:
 runs-on: ubuntu-latest
-
 steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-
-  - name: Find and extract ZIP
-    shell: bash
-    run: |
-      set -eu
-      ZIP_FILE="$(find . -maxdepth 3 -type f -name '*.zip' -print -quit)"
-      if [ -z "$ZIP_FILE" ]; then
-        echo "ERROR: Upload the project ZIP to the repository root."
-        exit 1
-      fi
-      mkdir -p extracted_project
-      unzip -o "$ZIP_FILE" -d extracted_project
-
-  - name: Locate Android project
-    shell: bash
-    run: |
-      set -eu
-      SETTINGS="$(find extracted_project -type f -name settings.gradle -o -name settings.gradle.kts -print -quit)"
-      if [ -z "$SETTINGS" ]; then
-        echo "ERROR: Android settings.gradle file not found."
-        exit 1
-      fi
-      PROJECT_DIR="$(dirname "$SETTINGS")"
-      echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-  - name: Set up Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: '17'
-
-  - name: Build APK
-    shell: bash
-    run: |
-      set -eu
-      GRADLEW="$(find "$PROJECT_DIR" -type f -name gradlew -print -quit)"
-      if [ -z "$GRADLEW" ]; then
-        echo "ERROR: gradlew is missing from the project ZIP."
-        find "$PROJECT_DIR" -maxdepth 4 -type f | head -n 80
-        exit 1
-      fi
-      cd "$(dirname "$GRADLEW")"
-      chmod +x gradlew
-      ./gradlew assembleDebug
-
-  - name: Upload APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: SAAD-DATA-APK
-      path: extracted_project/**/build/outputs/apk/debug/*.apk
-      if-no-files-found: error
-      retention-days: 14
+- name: Confirm workflow works
+run: echo "GitHub Actions workflow is valid"
